@@ -1,0 +1,84 @@
+# Core Environment & Interactive Development
+ipykernel                 # Jupyter Notebook kernel
+jupyterlab                # JupyterLab interface
+ipywidgets                # Interactive widgets for notebooks
+python-dotenv             # Load environment variables from .env files
+watchdog                  # File watching & automatic reload
+
+# Data Science & Mathematics
+numpy                     # Numerical computing
+pandas                    # Data analysis & DataFrames
+scipy                     # Scientific computing
+numexpr                   # Fast numerical expression evaluator
+imblearn                  # Imbalanced dataset handling
+
+# Validation & Infrastructure
+jsonschema                # JSON Schema validation
+nest-asyncio              # Async support in notebooks
+networkx                  # Graph processing
+packaging                 # Version parsing utilities
+psutil                    # System & process utilities
+pydantic                  # Data validation
+pydantic-ai               # AI agent framework
+pydantic-settings         # reads settings from .env
+pytz                      # Timezone support
+typing-extensions         # Forward compatibility for typing
+validators                # URL & input validation
+
+# LangChain-LangGraph Ecosystem / Multi-Agent / MCP
+langchain                  # LangChain framework
+langchain-chroma          # Chroma vector store integration
+langchain-classic         # Legacy LangChain components
+langchain-community       # Community integrations
+langchain-core            # Core LangChain abstractions
+langchain-google-genai    # Google Gemini integration
+langchain-google-vertexai # Vertex AI integration
+langchain-groq            # Groq integration
+langchain[mcp]            # MCP adapters
+langchain-openai          # OpenAI integration
+langchain-tavily          # Tavily Search integration
+langchain-text-splitters  # Text splitting utilities
+langgraph                  # Stateful agent workflows
+langgraph-checkpoint-sqlite # SQLite checkpoint backend
+langgraph-cli[inmem]       # CLI with in-memory runtime
+fastmcp                    # Fast MCP implementation
+
+# Document Processing & Parsing
+beautifulsoup4            # HTML/XML parsing
+jq                        # JSON processing
+lxml                      # High-performance XML/HTML parser
+nbconvert                 # Notebook conversion
+pdfplumber                # PDF table extraction
+pymupdf                   # Fast PDF parser
+pypdf                     # PDF reader
+python-docx               # Microsoft Word support
+python-pptx               # PowerPoint support
+
+# Vector Databases & Retrieval
+chromadb                  # Chroma vector database
+faiss-cpu                 # Facebook AI Similarity Search
+
+# API Development & Networking
+fastapi                   # REST API framework
+httpx                     # Async HTTP client
+requests                  # HTTP client
+uvicorn[standard]         # Production ASGI server
+
+# Evaluation, Testing & Monitoring
+pytest                    # Testing framework
+
+# Google Cloud Platform
+cloud-sql-python-connector # Cloud SQL connector
+google-cloud-documentai   # Google Document AI client
+google-cloud-storage      # Google Cloud Storage client
+
+# Developer Utilities
+aiofiles                  # Async file operations
+lxml                      # High-performance XML/HTML parser
+orjson                    # High-performance JSON
+python-dateutil           # Date parsing utilities
+python-multipart          # FastAPI file uploads
+rich                      # Rich terminal output
+tenacity                  # Retry utilities
+tqdm                      # Progress bars
+typer                     # CLI framework
