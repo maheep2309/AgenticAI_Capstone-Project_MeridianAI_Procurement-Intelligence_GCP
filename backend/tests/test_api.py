@@ -57,7 +57,7 @@ def test_chunking_splits_long_text_and_keeps_metadata():
 
 
 def test_sample_pdfs_load_and_chunk():
-    """The demo PDFs in sample_docs/ can be read and split (no Google Cloud needed)."""
+    """The demo PDFs in sample_uploaded_docs/ can be read and split (no Google Cloud needed)."""
     import glob
     import os
 
@@ -65,7 +65,7 @@ def test_sample_pdfs_load_and_chunk():
 
     from rag.data_ingestion import split_into_chunks
 
-    folder = os.path.join(os.path.dirname(__file__), "..", "..", "sample_docs")
+    folder = os.path.join(os.path.dirname(__file__), "..", "..", "sample_uploaded_docs")
     pdfs = glob.glob(os.path.join(folder, "*.pdf"))
     assert len(pdfs) == 4
     for pdf in pdfs:

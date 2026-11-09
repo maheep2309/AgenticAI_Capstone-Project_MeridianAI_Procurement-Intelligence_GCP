@@ -82,7 +82,7 @@ def test_local_ingest_and_ask(offline_local_store, monkeypatch, tmp_path):
     import os
     import shutil
 
-    pdf = sorted(glob.glob(os.path.join(os.path.dirname(__file__), "..", "..", "sample_docs", "*.pdf")))[0]
+    pdf = sorted(glob.glob(os.path.join(os.path.dirname(__file__), "..", "..", "sample_uploaded_docs", "*.pdf")))[0]
     summary = ingest_pdf(pdf, "local://sample.pdf")
     assert summary["chunks"] > 0
 

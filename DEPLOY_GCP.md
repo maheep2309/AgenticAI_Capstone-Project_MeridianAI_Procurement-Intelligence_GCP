@@ -1,165 +1,186 @@
-# Putting Meridian AI on Google Cloud
+# Deploying Meridian AI to Google Cloud
 
-This page explains how to run the app on the internet and use document Q&A. It is written step by step. If a word is new, a short explanation follows it.
+This guide covers deploying Meridian AI to **Cloud Run** with **Vertex AI Vector Search**, **Cloud Storage** and **Secret Manager**, using the GitHub Actions workflow in [.github/workflows/deploy.yml](.github/workflows/deploy.yml).
 
-**Time:** about 30 minutes of work, plus 30–45 minutes of waiting the first time.
-**Money:** read [Costs](#costs-read-this-first) before you start.
-
----
-
-## The big picture
-
-You will do four things:
-
-1. Make a **Google Cloud project** (your own space in Google's cloud).
-2. Make a **robot account** that GitHub can use to set things up for you.
-3. Tell **GitHub** the robot's key and your Gemini key.
-4. Press **Run workflow**. GitHub then creates everything and publishes the app.
-
-You do **not** create the database, storage or server by hand. The file `.github/workflows/deploy.yml` does it using Google's command-line tool (`gcloud`).
+**Effort:** about 30 minutes of setup, plus 30–60 minutes of waiting on the first run (Vector Search provisioning).
 
 ---
 
-## Costs (read this first)
+## Deployment architecture
 
-| Service | How you are charged |
-|---|---|
-| **Vector Search** (the database for document Q&A) | **By the hour while it is running, even if nobody uses it.** This is the main cost. |
-| Cloud Run (the web server) | Only when used. Light use is usually inside the free monthly allowance. |
-| Cloud Storage, Cloud Build, Secret Manager | A few cents, or free allowances |
-| Gemini API (the chat model) | Has a free tier. Free-tier content may be used by Google to improve its products, so use only the sample documents. |
-
-**Things to know about Vector Search**
-
-- The setup script does not choose a machine size or number of copies. Google's documentation says the number of copies defaults to **2**, so your hourly cost may be higher than a single small machine. A small machine is reported at roughly **$0.08 per hour (about $56 a month)** by third-party price guides. That is not an official figure; check https://cloud.google.com/vertex-ai/pricing.
-- So: **do your cloud work in one sitting and switch the database off when you finish** (see [Switch everything off](#switch-everything-off)). Creating it again takes 30–45 minutes.
-
-**The $300 free credit**
-
-- New Google Cloud customers get **$300 of credit for 90 days** (about three months).
-- You need a **credit or debit card**. Google places a temporary hold to check it. It is not a charge.
-- You are **not charged automatically** when the trial ends. You are charged only if you choose to upgrade.
-- The trial ends at whichever comes first: 90 days or $300 spent. After a 30-day grace period, trial resources are **deleted**.
-- Only **new customers** qualify (you have never paid Google Cloud before).
-- Trial accounts have limits. Google says some generative-AI services are restricted, and people report tight rate limits. The chat model here uses your Gemini key, so it is not affected. The **embedding** step (turning text into numbers) uses Google Cloud and could be limited. If you see errors like "project is not allowed" during upload, activate the full paid account in Billing: your remaining credit is still used first, and you are charged only for usage beyond it.
-- Details: https://docs.cloud.google.com/free/docs/free-cloud-features
-
-**Set a budget alert first** (step 4 below). It sends you an email as your spending grows. It does **not** stop the spending: you must switch things off yourself.
-
----
-
-## Step by step
-
-### Step 1 · Get a Gemini API key
-
-1. Go to https://aistudio.google.com/apikey and sign in.
-2. Click **Create API key** and copy it.
-3. Treat it like a password: never post it or put it in Git.
-
-### Step 2 · Create your Google Cloud account
-
-Go to https://cloud.google.com/free and choose **Get started for free**. Add your card when asked.
-
-### Step 3 · Create a project
-
-A **project** holds all your cloud things and your bill.
-
-1. Open https://console.cloud.google.com/.
-2. Click the project name at the top → **New project**.
-3. Pick a name. Write down the **Project ID** shown underneath (for example `meridian-ai-123456`). You will use the ID, not the name.
-
-### Step 4 · Link billing and set a budget alert
-
-1. Console menu → **Billing** → link your billing account to the project.
-2. Console menu → **Billing → Budgets & alerts → Create budget**. Choose your project, set for example **$20**, and keep the email alerts on.
-
-### Step 5 · Install and sign in to `gcloud`
-
-Install Google's command-line tool: https://cloud.google.com/sdk/docs/install. Then:
-
-```bash
-gcloud auth login
-gcloud config set project YOUR_PROJECT_ID
+```
+GitHub (push to main)
+   │  GitHub Actions, authenticated as the github-deployer service account
+   ▼
+deploy.yml
+   ├─ enable APIs
+   ├─ Cloud Storage bucket  <project>-vector-staging
+   ├─ Vertex AI Vector Search index + endpoint (bootstrapped with generate_json.py)
+   ├─ Secret Manager: GOOGLE_API_KEY  +  runtime IAM grants
+   ├─ Cloud Build ─► gcr.io/<project>/meridian-ai-cloud-run
+   └─ Cloud Run service  meridian-ai-cloud-run  (public, max 3 instances)
+                          runs as the default compute service account
 ```
 
-### Step 6 · Create the robot account
+Two service accounts are involved:
 
-A **service account** is an account for a program instead of a person. Run these (replace `YOUR_PROJECT_ID`):
+| Service account | Used by | Authenticates with |
+|---|---|---|
+| `github-deployer@<project>.iam.gserviceaccount.com` | GitHub Actions, to create resources and deploy | A JSON key stored as a GitHub secret |
+| `<PROJECT_NUMBER>-compute@developer.gserviceaccount.com` | Cloud Build (image build) and Cloud Run (the running app) | No key: IAM roles only |
+
+---
+
+## Costs
+
+| Service | Billing |
+|---|---|
+| **Vertex AI Vector Search** | **Per hour while the index is deployed, even with no traffic.** This is the main cost. Check https://cloud.google.com/vertex-ai/pricing. |
+| Cloud Run | Per request; light use usually stays within the free tier |
+| Cloud Storage, Cloud Build, Secret Manager, Artifact Registry | Cents, or within free allowances |
+| Gemini API | Free tier available; content on the free tier may be used by Google to improve products, so use only the fictional sample documents |
+
+- New Google Cloud customers receive **$300 credit for 90 days**. A card is required for verification, and you are not charged automatically when the trial ends.
+- **Set a budget alert** before deploying (Step 2). Alerts notify you but do not stop spending.
+- **Undeploy Vector Search when you are done** (see [Tear down](#tear-down)). Re-creating it takes 30–60 minutes.
+
+---
+
+## Prerequisites
+
+- A Google account and a GitHub account
+- The `gcloud` CLI: https://cloud.google.com/sdk/docs/install (or use **Cloud Shell** in the Console, which has it pre-installed)
+- A Gemini API key (Step 5)
+
+---
+
+## Step 1 · Create the project
+
+1. In https://console.cloud.google.com/, open the project picker and choose **New project**.
+2. Note the **Project ID** (for example `meridian-ai-123456`) and the **Project number** (on the project dashboard). Commands below use both.
+
+## Step 2 · Link billing and set a budget
+
+1. **Billing** → link a billing account to the project.
+2. **Billing → Budgets & alerts → Create budget**, for example $20 with e-mail alerts.
+
+## Step 3 · Create the deployer service account
+
+Run as the project Owner (Cloud Shell, or a terminal after `gcloud auth login`):
 
 ```bash
-export PROJECT_ID="YOUR_PROJECT_ID"        # Windows PowerShell: $env:PROJECT_ID="YOUR_PROJECT_ID"
+PROJECT_ID=YOUR_PROJECT_ID
+DEPLOYER=github-deployer@${PROJECT_ID}.iam.gserviceaccount.com
 
-gcloud iam service-accounts create github-deployer \
-  --display-name="GitHub Actions Deployer" --project=$PROJECT_ID
+gcloud config set project $PROJECT_ID
+gcloud iam service-accounts create github-deployer --display-name="GitHub Actions Deployer"
 
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-  --member="serviceAccount:github-deployer@${PROJECT_ID}.iam.gserviceaccount.com" \
-  --role="roles/editor"
+for ROLE in \
+  roles/editor \
+  roles/resourcemanager.projectIamAdmin \
+  roles/secretmanager.admin \
+  roles/storage.admin; do
+  gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:${DEPLOYER}" --role="$ROLE" --condition=None
+done
 
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-  --member="serviceAccount:github-deployer@${PROJECT_ID}.iam.gserviceaccount.com" \
-  --role="roles/resourcemanager.projectIamAdmin"
-
-gcloud iam service-accounts keys create github-deployer-key.json \
-  --iam-account=github-deployer@${PROJECT_ID}.iam.gserviceaccount.com
+gcloud iam service-accounts keys create github-deployer-key.json --iam-account=$DEPLOYER
 ```
 
-The last command makes a file, `github-deployer-key.json`. It is a **password for the robot**.
-
-> **Keep it safe.**
-> - Never commit it, email it, or paste it anywhere except the GitHub secret in step 8. Delete the file afterwards.
-> - These permissions are broad on purpose, to keep the setup simple. A real company would give the robot only what it needs.
-> - If it ever leaks: Console → IAM & Admin → Service accounts → `github-deployer` → Keys → delete it.
-
-### Step 7 · Put the code on your own GitHub
-
-The robot runs from **your** GitHub copy. On this repository's page click **Fork**. Then open the **Actions** tab of your fork and enable workflows if GitHub asks.
-
-### Step 8 · Give GitHub three secrets
-
-In your fork: **Settings → Secrets and variables → Actions → New repository secret**. Add:
-
-| Name | Value |
+| Role | Why the workflow needs it |
 |---|---|
-| `GCP_PROJECT_ID` | Your Project ID |
-| `GCP_CREDENTIALS_JSON` | The **whole contents** of `github-deployer-key.json` |
-| `GOOGLE_API_KEY` | Your Gemini key |
+| `roles/editor` | Create the bucket, Vector Search index/endpoint, secret, Cloud Build job and Cloud Run service |
+| `roles/resourcemanager.projectIamAdmin` | Grant `roles/aiplatform.user` to the Cloud Run service account |
+| `roles/secretmanager.admin` | Grant the Cloud Run service account access to the `GOOGLE_API_KEY` secret. Editor cannot change a secret's IAM policy. |
+| `roles/storage.admin` | Grant the Cloud Run service account access to the bucket. Editor cannot change a bucket's IAM policy. |
 
-### Step 9 · Run the workflow
+`github-deployer-key.json` is a credential. Paste it only into the GitHub secret in Step 6, then delete the local file. If it leaks, delete the key under **IAM & Admin → Service accounts → github-deployer → Keys**.
 
-**Actions → Deploy to GCP Cloud Run → Run workflow.** (It also starts by itself whenever you push to `main`.)
+> These roles are broad to keep a prototype deployment simple. For production, use Workload Identity Federation instead of a JSON key, and a custom role with only the permissions listed above.
 
-It does these jobs in order:
+## Step 4 · Grant the build/runtime service account its roles
 
-| Job | In plain words |
+Newer projects, and projects inside an organisation, no longer give the default compute service account the Editor role automatically. Cloud Build runs the image build as this account, so it needs these roles:
+
+```bash
+PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format="value(projectNumber)")
+COMPUTE_SA=${PROJECT_NUMBER}-compute@developer.gserviceaccount.com
+
+for ROLE in \
+  roles/cloudbuild.builds.builder \
+  roles/artifactregistry.createOnPushWriter \
+  roles/logging.logWriter; do
+  gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:${COMPUTE_SA}" --role="$ROLE" --condition=None
+done
+```
+
+| Role | Why |
 |---|---|
-| Sign in | Logs in as the robot |
-| Switch on services | Turns on the Google services the app needs |
-| Storage | Creates a bucket (a cloud folder) for PDFs and logs |
-| Vector database | Creates the index and endpoint, then starts the service. **This is the 30–45 minute wait** |
-| Secrets | Stores your Gemini key in the cloud safe (Secret Manager) |
-| Build | Packs the app into a Docker box |
-| Deploy | Starts it on Cloud Run and makes it public |
+| `roles/cloudbuild.builds.builder` | Read the uploaded source from the `<project>_cloudbuild` bucket and run the build |
+| `roles/artifactregistry.createOnPushWriter` | Push the image to `gcr.io/<project>/…`, which is backed by Artifact Registry, and create that repository on the first push |
+| `roles/logging.logWriter` | Write build logs |
 
-Wait for the green tick. If a step fails, open it, read the last lines, and re-run: it is safe to run again.
+The runtime roles (`roles/aiplatform.user`, `roles/storage.objectAdmin` on the bucket and `roles/secretmanager.secretAccessor` on the secret) are granted by the workflow itself.
 
-> **Possible snag (not yet tested on a fresh project):** the build step names the image `gcr.io/…`. Google's old Container Registry is closed, and `gcr.io` names now need a matching Artifact Registry repository. If the build or push fails with "permission denied" or "repository does not exist", create a Docker repository in Artifact Registry (or change `IMAGE_NAME` at the top of `deploy.yml` to `us-central1-docker.pkg.dev/YOUR_PROJECT_ID/meridian/meridian-ai-cloud-run`, after creating that repository).
+IAM changes can take a few minutes to apply. Wait 2–3 minutes before running the workflow.
 
-### Step 10 · Collect the values you need
+## Step 5 · Get a Gemini API key
+
+1. Go to https://aistudio.google.com/apikey and choose **Create API key**.
+2. Under **API restrictions**, restrict the key to the **Generative Language API**. Leave **Application restrictions** at **None**, because Cloud Run has no fixed outbound IP.
+
+> **Organisation policy:** if the Console says *"API keys are disallowed. Your organisation's security policy disallows API keys"*, your project is in an organisation that blocks key creation. Either create the key in a project outside that organisation (an API key works from any project; usage is billed to the project that owns the key), or ask an organisation admin to override the policy for this project only.
+
+## Step 6 · Add GitHub secrets
+
+In the GitHub repository: **Settings → Secrets and variables → Actions → New repository secret**.
+
+| Secret | Value |
+|---|---|
+| `GCP_PROJECT_ID` | The Project ID from Step 1 |
+| `GCP_CREDENTIALS_JSON` | The entire contents of `github-deployer-key.json`, including the braces |
+| `GOOGLE_API_KEY` | The Gemini key from Step 5 |
+
+## Step 7 · Run the workflow
+
+The workflow runs on every push to `main`, or manually from **Actions → Deploy to GCP Cloud Run → Run workflow**.
+
+| Step in deploy.yml | What it does |
+|---|---|
+| Authenticate / Set up Cloud SDK | Signs in as `github-deployer` |
+| Enable Required GCP APIs | Enables Vertex AI, Cloud Run, Secret Manager, Storage, Cloud Build, Artifact Registry, IAM and others, then waits 90 s for propagation |
+| Ensure Storage Buckets Exist | Creates `<project>-vector-staging` (uniform access, public access prevented) |
+| Ensure Initial Embeddings File Exists | Runs `generate_json.py` to write one 768-dim bootstrap vector, then uploads it to the bucket |
+| Provision Vector Search Index & Endpoint | Creates index `financial-docs-production` (768 dims, dot product, stream updates) and endpoint `financial-docs-endpoint`, deploys the index as `deployed_financial_docs`, then removes the bootstrap vector. **This is the long wait.** |
+| Ensure Secret Manager Has API Key | Stores `GOOGLE_API_KEY` as a new secret version and grants the Cloud Run service account its runtime roles |
+| Build and Push Docker Image | `gcloud builds submit` builds the multi-stage Dockerfile |
+| Deploy to Cloud Run | Deploys `meridian-ai-cloud-run` with `APP_MODE=cloud`, the index and endpoint IDs, and the secret |
+| Allow Public Access to Cloud Run | Grants `allUsers` the invoker role and prints the IAM policy |
+
+Every step is idempotent: existing resources are detected and skipped, so a failed run can simply be re-run.
+
+## Step 8 · Verify
+
+1. In the **Deploy to Cloud Run** log, open the `Service URL: https://meridian-ai-cloud-run-….run.app`.
+2. Check `https://<service-url>/api/health`. It should return `{"status": "ok", "mode": "cloud"}`.
+3. Upload the PDFs from `sample_uploaded_docs/` and ask one of the test questions from the [README](README.md#try-it).
+
+> The service is **public with no authentication**. Anyone with the URL can use your Gemini quota and upload files. Do not upload confidential documents.
+
+## Optional · Run locally against the cloud resources
+
+Get the index and endpoint IDs:
 
 ```bash
 gcloud ai indexes list --region=us-central1
 gcloud ai index-endpoints list --region=us-central1
 ```
 
-Note the ID of the index `financial-docs-production` and of the endpoint `financial-docs-endpoint`. The web address of your app is printed as `Service URL: https://…run.app` in the *Deploy to Cloud Run* step of the workflow log.
-
-### Step 11 · Use it
-
-- **On the internet:** open the Service URL. Upload the PDFs from `sample_docs/` and ask questions.
-- **From your own computer** (using the cloud database): put these in your `.env`, sign in with `gcloud auth application-default login`, and start the app as in the README.
+Set these in `.env`:
 
 ```
+APP_MODE=cloud
 GCP_PROJECT_ID=YOUR_PROJECT_ID
 GCP_REGION=us-central1
 GCS_BUCKET_NAME=YOUR_PROJECT_ID-vector-staging
@@ -169,15 +190,13 @@ VECTOR_SEARCH_INDEX_ENDPOINT_ID=<endpoint id>
 GOOGLE_API_KEY=<your Gemini key>
 ```
 
-> **Careful:** the public address has **no login**. Anyone who finds it can use your Gemini quota and upload files. The service is capped at 3 copies to limit the damage. Do not upload private documents, and switch it off when you are done.
+Authenticate with `gcloud auth application-default login`. If `GCP_SERVICE_ACCOUNT_PATH` points to an existing key file, that file is used instead; remove the line to use your own login. Your account needs `roles/aiplatform.user` and access to the bucket.
 
 ---
 
-## Switch everything off
+## Tear down
 
-Do this when you finish. It stops the charges.
-
-**Only the expensive part (the vector database):**
+**Vector Search (the hourly cost):**
 
 ```bash
 REGION=us-central1
@@ -186,32 +205,31 @@ gcloud ai index-endpoints delete ENDPOINT_ID --region=$REGION
 gcloud ai indexes delete INDEX_ID --region=$REGION
 ```
 
-**The web server:**
+**Cloud Run service:**
 
 ```bash
 gcloud run services delete meridian-ai-cloud-run --region=us-central1
 ```
 
-**Everything (safest):** deleting the project removes all of its resources. Google keeps it recoverable for 30 days.
+**Everything:** `gcloud projects delete YOUR_PROJECT_ID`. The project stays recoverable for 30 days.
 
-```bash
-gcloud projects delete YOUR_PROJECT_ID
-```
-
-Also: delete the robot's key (step 6), delete `github-deployer-key.json` from your computer, and remove the three GitHub secrets.
-
-**Check:** next day, Billing → Reports should show the daily cost near zero.
+Also delete the `github-deployer` key, the local `github-deployer-key.json` and the three GitHub secrets. The next day, check **Billing → Reports** to confirm daily cost is near zero.
 
 ---
 
-## If something goes wrong
+## Troubleshooting
 
-| What you see | Likely cause and fix |
-|---|---|
-| `403` / "permission denied" from Storage or Vertex AI | Wrong account or key. Run `gcloud auth list`; for the app use `gcloud auth application-default login` |
-| "API has not been used… or it is disabled" | Wait a couple of minutes and retry; the workflow switches the services on |
-| "Billing account not enabled" | Link billing to the project (step 4) |
-| Workflow fails at sign-in | `GCP_CREDENTIALS_JSON` must be the entire file, including the `{ }` |
-| App opens but answers fail | Open the Cloud Run **Logs**; check the Gemini key secret and the index IDs |
-| "model not found" | Set `VERTEX_LLM_MODEL_NAME` to a current model: https://ai.google.dev/gemini-api/docs/models |
-| First upload is slow or cold | Cloud Run wakes up from zero; the first request is slower |
+| Error | Cause | Fix |
+|---|---|---|
+| `python: can't open file '…/generate_json.py'` | Bootstrap script missing from the repo | Make sure `generate_json.py` is committed at the repository root |
+| `Permission 'secretmanager.secrets.setIamPolicy' denied` (as `github-deployer`) | Editor cannot change a secret's IAM policy | Grant `roles/secretmanager.admin` to the deployer (Step 3) |
+| `Permission 'storage.buckets.setIamPolicy' denied` (as `github-deployer`) | Editor cannot change a bucket's IAM policy | Grant `roles/storage.admin` to the deployer (Step 3) |
+| `<number>-compute@… does not have storage.objects.get access` on `<project>_cloudbuild` | Cloud Build runs as the compute service account, which has no roles | Step 4 |
+| Build fails pushing to `gcr.io` ("permission denied" / "repository does not exist") | Missing Artifact Registry permission | `roles/artifactregistry.createOnPushWriter` (Step 4) |
+| Build `TIMEOUT` after 3600 s during `pip install` | Unpinned dependencies make pip backtrack | Keep `requirements.txt` runtime-only and pinned; dev tools belong in `requirements-dev.txt` |
+| "API keys are disallowed" | Organisation policy | See the note in Step 5 |
+| Fails at authentication | `GCP_CREDENTIALS_JSON` is incomplete | Paste the whole JSON file, including `{ }` |
+| "API has not been used … or it is disabled" | API enablement still propagating | Wait a few minutes and re-run |
+| "Billing account not enabled" | No billing linked | Step 2 |
+| App loads but answers fail | Bad Gemini key, retired model name, or index not yet deployed | Check Cloud Run **Logs**; set `VERTEX_LLM_MODEL_NAME` to a current model (https://ai.google.dev/gemini-api/docs/models) |
+| First request is slow | Cloud Run scales to zero | Expected cold start |
