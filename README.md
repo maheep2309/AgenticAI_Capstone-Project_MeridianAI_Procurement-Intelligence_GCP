@@ -1,6 +1,6 @@
 # Meridian AI: Procurement Intelligence on Google Cloud
 
-**Agentic AI capstone project by Maheep**
+**Agentic AI capstone using Langchain**
 
 Meridian AI helps a finance team review procurement requests before payment and get answers from its own policy documents. It combines a **multi-agent audit pipeline** with a **RAG document Q&A service**, runs on a laptop with a single Gemini API key, and deploys to **Google Cloud Run** with **Vertex AI Vector Search** through a GitHub Actions pipeline.
 
@@ -125,7 +125,7 @@ DEPLOY_GCP.md                 Step-by-step Google Cloud deployment guide
 **Prerequisites:** Python 3.12, Git, Node.js 20+ (for the web UI) and a Gemini API key from https://aistudio.google.com/apikey.
 
 ```bash
-git clone https://github.com/maheep2309/AgenticAI_Capstone-Project_MeridianAI_Procurement-Intelligence_GCP.git meridian-ai
+git clone https://github.com/maheep2309/AgenticAI_Capstone-Project_MeridianAI_Procurement-Intelligence_Langchain_GCP.git meridian-ai
 cd meridian-ai
 
 python3.12 -m venv .venv
