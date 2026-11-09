@@ -1,0 +1,68 @@
+# Local development: runtime packages + notebooks, tests and extra integrations.
+# Not used by the Docker image.
+-r requirements.txt
+
+# Core Environment & Interactive Development
+ipykernel                 # Jupyter Notebook kernel
+jupyterlab                # JupyterLab interface
+ipywidgets                # Interactive widgets for notebooks
+python-dotenv             # Load environment variables from .env files
+watchdog                  # File watching & automatic reload
+
+# Data Science & Mathematics
+numpy                     # Numerical computing
+pandas                    # Data analysis & DataFrames
+scipy                     # Scientific computing
+numexpr                   # Fast numerical expression evaluator
+imblearn                  # Imbalanced dataset handling
+
+# Validation & Infrastructure
+jsonschema                # JSON Schema validation
+nest-asyncio              # Async support in notebooks
+networkx                  # Graph processing
+packaging                 # Version parsing utilities
+psutil                    # System & process utilities
+pydantic-ai               # AI agent framework
+pytz                      # Timezone support
+typing-extensions         # Forward compatibility for typing
+validators                # URL & input validation
+
+# LangChain-LangGraph Ecosystem / Multi-Agent / MCP
+langchain-classic         # Legacy LangChain components
+langchain-groq            # Groq integration
+langchain[mcp]            # MCP adapters
+langchain-openai          # OpenAI integration
+langchain-tavily          # Tavily Search integration
+langgraph-checkpoint-sqlite # SQLite checkpoint backend
+langgraph-cli[inmem]      # CLI with in-memory runtime
+fastmcp                   # Fast MCP implementation
+
+# Document Processing & Parsing
+beautifulsoup4            # HTML/XML parsing
+jq                        # JSON processing
+lxml                      # High-performance XML/HTML parser
+nbconvert                 # Notebook conversion
+pdfplumber                # PDF table extraction
+pymupdf                   # Fast PDF parser
+python-docx               # Microsoft Word support
+python-pptx               # PowerPoint support
+
+# Vector Databases & Retrieval
+faiss-cpu                 # Facebook AI Similarity Search
+
+# Evaluation, Testing & Monitoring
+pytest==9.1.1             # Testing framework
+httpx==0.28.1             # used by FastAPI's TestClient
+
+# Google Cloud
+cloud-sql-python-connector # Cloud SQL connector
+google-cloud-documentai   # Google Document AI client
+
+# Developer Utilities
+aiofiles                  # Async file operations
+orjson                    # High-performance JSON
+python-dateutil           # Date parsing utilities
+rich                      # Rich terminal output
+tenacity                  # Retry utilities
+tqdm                      # Progress bars
+typer                     # CLI framework

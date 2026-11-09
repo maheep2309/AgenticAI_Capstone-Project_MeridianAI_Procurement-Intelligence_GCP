@@ -1,84 +1,33 @@
-# Core Environment & Interactive Development
-ipykernel                 # Jupyter Notebook kernel
-jupyterlab                # JupyterLab interface
-ipywidgets                # Interactive widgets for notebooks
-python-dotenv             # Load environment variables from .env files
-watchdog                  # File watching & automatic reload
+# Runtime dependencies only: exactly what backend/ needs. Installed by the Dockerfile.
+# Versions are pinned (to uv.lock) so the project behaves the same on every computer
+# and Cloud Build does not spend an hour resolving versions. Tested with Python 3.12.
+# For local development (notebooks, tests, extra integrations) use: pip install -r requirements-dev.txt
 
-# Data Science & Mathematics
-numpy                     # Numerical computing
-pandas                    # Data analysis & DataFrames
-scipy                     # Scientific computing
-numexpr                   # Fast numerical expression evaluator
-imblearn                  # Imbalanced dataset handling
+# --- Web API ---
+fastapi==0.143.0
+uvicorn[standard]==0.54.0
+python-multipart==0.0.32          # needed for file uploads
+pydantic==2.14.1
+pydantic-settings==2.15.0         # reads settings from .env
+structlog==25.5.0                 # structured (JSON) logging
+requests==2.34.2                  # live FX rate lookup
 
-# Validation & Infrastructure
-jsonschema                # JSON Schema validation
-nest-asyncio              # Async support in notebooks
-networkx                  # Graph processing
-packaging                 # Version parsing utilities
-psutil                    # System & process utilities
-pydantic                  # Data validation
-pydantic-ai               # AI agent framework
-pydantic-settings         # reads settings from .env
-pytz                      # Timezone support
-typing-extensions         # Forward compatibility for typing
-validators                # URL & input validation
+# --- LangChain v1 ---
+langchain==1.4.5                  # create_agent + agent middleware
+langchain-core==1.6.10            # @tool, prompts, LCEL runnables
+langchain-community==0.4.2        # PyPDFLoader
+langchain-text-splitters==1.1.3
+langchain-google-genai==4.4.1     # Gemini chat model + embeddings (API key locally, Vertex AI in cloud)
+langgraph==1.2.15                 # engine behind create_agent (installed for you; we write no graph code)
 
-# LangChain-LangGraph Ecosystem / Multi-Agent / MCP
-langchain                  # LangChain framework
-langchain-chroma          # Chroma vector store integration
-langchain-classic         # Legacy LangChain components
-langchain-community       # Community integrations
-langchain-core            # Core LangChain abstractions
-langchain-google-genai    # Google Gemini integration
-langchain-google-vertexai # Vertex AI integration
-langchain-groq            # Groq integration
-langchain[mcp]            # MCP adapters
-langchain-openai          # OpenAI integration
-langchain-tavily          # Tavily Search integration
-langchain-text-splitters  # Text splitting utilities
-langgraph                  # Stateful agent workflows
-langgraph-checkpoint-sqlite # SQLite checkpoint backend
-langgraph-cli[inmem]       # CLI with in-memory runtime
-fastmcp                    # Fast MCP implementation
+# --- Local mode (APP_MODE=local) ---
+langchain-chroma==1.1.0           # Chroma vector store on disk
+chromadb==1.5.9
 
-# Document Processing & Parsing
-beautifulsoup4            # HTML/XML parsing
-jq                        # JSON processing
-lxml                      # High-performance XML/HTML parser
-nbconvert                 # Notebook conversion
-pdfplumber                # PDF table extraction
-pymupdf                   # Fast PDF parser
-pypdf                     # PDF reader
-python-docx               # Microsoft Word support
-python-pptx               # PowerPoint support
+# --- Cloud mode (APP_MODE=cloud) ---
+langchain-google-vertexai==3.2.4  # Vertex AI Vector Search store
+google-cloud-aiplatform==1.165.1
+google-cloud-storage==3.17.0
 
-# Vector Databases & Retrieval
-chromadb                  # Chroma vector database
-faiss-cpu                 # Facebook AI Similarity Search
-
-# API Development & Networking
-fastapi                   # REST API framework
-httpx                     # Async HTTP client
-requests                  # HTTP client
-uvicorn[standard]         # Production ASGI server
-
-# Evaluation, Testing & Monitoring
-pytest                    # Testing framework
-
-# Google Cloud Platform
-cloud-sql-python-connector # Cloud SQL connector
-google-cloud-documentai   # Google Document AI client
-google-cloud-storage      # Google Cloud Storage client
-
-# Developer Utilities
-aiofiles                  # Async file operations
-lxml                      # High-performance XML/HTML parser
-orjson                    # High-performance JSON
-python-dateutil           # Date parsing utilities
-python-multipart          # FastAPI file uploads
-rich                      # Rich terminal output
-tenacity                  # Retry utilities
-tqdm                      # Progress bars
-typer                     # CLI framework
+# --- PDF reading ---
+pypdf==6.20.1
