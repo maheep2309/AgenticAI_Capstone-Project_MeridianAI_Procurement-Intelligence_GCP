@@ -218,6 +218,14 @@ jobs:
             --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
             --role="roles/secretmanager.secretAccessor" >/dev/null
 
+          # The app on Cloud Run runs as this same default compute SA (no key; IAM roles only).
+          # It needs Vertex AI (embeddings + Vector Search) and read/write on the staging bucket.
+          RUNTIME_SA="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+          gcloud projects add-iam-policy-binding ${{ env.PROJECT_ID }} \
+            --member="$RUNTIME_SA" --role="roles/aiplatform.user" --condition=None >/dev/null
+          gcloud storage buckets add-iam-policy-binding ${{ env.VECTOR_BUCKET }} \
+            --member="$RUNTIME_SA" --role="roles/storage.objectAdmin" >/dev/null
+
       # --- Phase 5: Build & Deploy Application ---
       - name: Build and Push Docker Image
         run: |
